@@ -85,10 +85,10 @@ def get_response(url):
     for i in range(5):
         response = requests.get(
             url, headers=get_headers())
-        # response = requests.get(url)
-        print("status code received:", response.status_code)
+
         if response.status_code != 200:
             # saving response to file for debugging purpose.
+            print("error - status code:", response.status_code)
             save_to_file(response)
             continue
         else:
@@ -124,10 +124,10 @@ def get_data_from_json(raw_json_data):
                 broker = property.get('brokerName')
                 property_url = property.get('detailUrl')
                 title = property.get('statusText')
-                rentZestimate = property_info.get('rentZestimate')
-                daysOnZillow = property_info.get('daysOnZillow')
-                priceReduction = property_info.get('priceReduction')
-                yearBuilt = property_info.get('yearBuilt')
+                rent_zestimate = property_info.get('rentZestimate')
+                days_on_zillow = property_info.get('daysOnZillow')
+                price_reduction = property_info.get('priceReduction')
+                year_built = property_info.get('yearBuilt')
 
                 data = {'address': address,
                         'city': city,
@@ -138,10 +138,10 @@ def get_data_from_json(raw_json_data):
                         'real estate provider': broker,
                         'url': property_url,
                         'title': title,
-                        'rent_zestimate': rentZestimate,
-                        'days_on_zillow': daysOnZillow,
-                        'price_reduction': priceReduction,
-                        'year_built': yearBuilt}
+                        'rent_zestimate': rent_zestimate,
+                        'days_on_zillow': days_on_zillow,
+                        'price_reduction': price_reduction,
+                        'year_built': year_built}
                 properties_list.append(data)
         except ValueError:
             print("Invalid json")
@@ -214,7 +214,7 @@ def parse(search_str, page):
     return properties_list
 
 
-def getPageCnt(search_str):
+def get_page_cnt(search_str):
 
     url = create_url(search_str, 1)
     response = get_response(url)
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     search_str = city + "-" + state
 
     # Get page count
-    pageCnt = int(getPageCnt(search_str))
+    pageCnt = int(get_page_cnt(search_str))
 
     print("Fetching data for %s" % (search_str))
 
