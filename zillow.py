@@ -5,6 +5,7 @@ import argparse
 import json
 import roundrobin
 from itertools import cycle
+import offerCalc as oc
 
 
 def clean(text):
@@ -71,7 +72,7 @@ def write_data_to_csv(data):
     # saving scraped data to csv.
 
     with open("properties-%s.csv" % (search_str), 'wb') as csvfile:
-        fieldnames = ['title', 'year_built', 'address', 'city', 'state', 'postal_code', 'price',
+        fieldnames = ['title', 'year_built', 'address', 'city', 'state', 'postal_code', 'price', 'offer',
                       'rent_zestimate', 'facts and features', 'days_on_zillow', 'price_reduction', 'real estate provider', 'url']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -128,12 +129,14 @@ def get_data_from_json(raw_json_data):
                 days_on_zillow = property_info.get('daysOnZillow')
                 price_reduction = property_info.get('priceReduction')
                 year_built = property_info.get('yearBuilt')
+                offer = oc.offer(rent_zestimate)
 
                 data = {'address': address,
                         'city': city,
                         'state': state,
                         'postal_code': postal_code,
                         'price': price,
+                        'offer': offer,
                         'facts and features': info,
                         'real estate provider': broker,
                         'url': property_url,
