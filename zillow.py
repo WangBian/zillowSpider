@@ -56,7 +56,7 @@ def create_url(search_str, page):
     # Creating Zillow URL
     url = "https://www.zillow.com/homes/for_sale/{0}_rb/{1}_p/?fromHomePage=true&shouldFireSellPageImplicitClaimGA=false&fromHomePageTab=buy".format(
         search_str, page)
-    print(url)
+    # print(url)
     return url
 
 
@@ -162,13 +162,13 @@ def parse(search_str, page):
     search_results = parser.xpath("//div[@id='search-results']//article")
 
     if not search_results:
-        print("parsing from json data")
+        # print("parsing from json data")
         # identified as type 2 page
         raw_json_data = parser.xpath(
             '//script[@data-zrr-shared-data-key="mobileSearchPageStore"]//text()')
         return get_data_from_json(raw_json_data)
 
-    print("parsing from html page")
+    # print("parsing from html page")
     properties_list = []
     for properties in search_results:
         raw_address = properties.xpath(
