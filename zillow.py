@@ -6,6 +6,7 @@ import json
 import roundrobin
 from itertools import cycle
 import offerCalc as oc
+import re
 
 
 def clean(text):
@@ -72,8 +73,8 @@ def write_data_to_csv(data):
     # saving scraped data to csv.
 
     with open("properties-%s.csv" % (search_str), 'wb') as csvfile:
-        fieldnames = ['title', 'year_built', 'address', 'city', 'state', 'postal_code', 'price', 'offer',
-                      'rent_zestimate', 'facts and features', 'days_on_zillow', 'price_reduction', 'real estate provider', 'url']
+        fieldnames = ['title', 'home_type', 'home_status', 'year_built', 'address', 'city', 'state', 'postal_code',
+                      'facts and features', 'price', 'offer', 'monthly_p_i', 'rent_zestimate', 'days_on_zillow', 'price_reduction', 'url']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for row in data:
@@ -129,25 +130,33 @@ def get_data_from_json(raw_json_data):
                 days_on_zillow = property_info.get('daysOnZillow')
                 price_reduction = property_info.get('priceReduction')
                 year_built = property_info.get('yearBuilt')
+                home_type = property_info.get('homeType')
+                home_status = property_info.get('homeStatus')
                 offer = oc.offer(rent_zestimate)
+
+                if price is not None and price != '':
+                    float_price = float(re.sub('[^0-9]', '', price[1:]))
+                    monthly_p_i = oc.mortgage_calc(float_price, 4.0)
 
                 data = {'address': address,
                         'city': city,
                         'state': state,
                         'postal_code': postal_code,
-                        'price': price,
+                        'price': float_price,
                         'offer': offer,
+                        'monthly_p_i': monthly_p_i,
                         'facts and features': info,
-                        'real estate provider': broker,
                         'url': property_url,
                         'title': title,
                         'rent_zestimate': rent_zestimate,
                         'days_on_zillow': days_on_zillow,
                         'price_reduction': price_reduction,
-                        'year_built': year_built}
+                        'year_built': year_built,
+                        'home_type': home_type,
+                        'home_status': home_status}
                 properties_list.append(data)
-        except ValueError:
-            print("Invalid json")
+        except ValueError as e:
+            print(e)
             return None
 
     return properties_list
@@ -244,7 +253,7 @@ if __name__ == "__main__":
 
     print("Fetching data for %s" % (search_str))
 
-    for page in range(1, pageCnt):
+    for page in range(1, 2):
         scraped_temp_data = parse(search_str, page)
         if scraped_temp_data:
             scraped_data = scraped_data + scraped_temp_data
