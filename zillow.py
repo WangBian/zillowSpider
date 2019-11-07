@@ -170,7 +170,7 @@ def get_data_from_json(raw_json_data):
                         'home_type': home_type,
                         'home_status': home_status,
                         'total_expense': total_expense}
-                if (title != 'New construction') or (title != 'Pre-foreclosure / Auction'):
+                if title not in ['New construction', 'Pre-foreclosure / Auction', 'Auction', 'Lot / Land for sale']:
                     properties_list.append(data)
         except ValueError as e:
             print(e)
