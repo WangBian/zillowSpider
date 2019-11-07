@@ -8,6 +8,8 @@ from itertools import cycle
 import offerCalc as oc
 import re
 
+interest_rate = 4.0
+
 
 def clean(text):
     if text:
@@ -74,7 +76,8 @@ def write_data_to_csv(data):
 
     with open("properties-%s.csv" % (search_str), 'wb') as csvfile:
         fieldnames = ['title', 'home_type', 'home_status', 'year_built', 'address', 'city', 'state', 'postal_code',
-                      'facts and features', 'price', 'offer', 'monthly_p_i', 'rent_zestimate', 'days_on_zillow', 'price_reduction', 'url']
+                      'facts and features', 'price', 'offer', 'monthly_p_i', 'total_expense', 'rent_zestimate',
+                      'days_on_zillow', 'price_reduction', 'url']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for row in data:
@@ -132,11 +135,23 @@ def get_data_from_json(raw_json_data):
                 year_built = property_info.get('yearBuilt')
                 home_type = property_info.get('homeType')
                 home_status = property_info.get('homeStatus')
-                offer = oc.offer(rent_zestimate)
+
+                float_price = 0
+                monthly_p_i = 0
+                offer = 0
+                total_expense = 0
 
                 if price is not None and price != '':
                     float_price = float(re.sub('[^0-9]', '', price[1:]))
-                    monthly_p_i = oc.mortgage_calc(float_price, 4.0)
+                    property_tax = float_price * 0.02
+                    monthly_p_i = oc.mortgage_calc(float_price, interest_rate)
+                    if rent_zestimate is not None and rent_zestimate != '':
+                        float_rent = float(rent_zestimate)
+                        offer = oc.offer(home_type, float_price,
+                                         interest_rate, float_rent, property_tax)
+                        monthly_p_i = oc.mortgage_calc(offer, interest_rate)
+                        total_expense = oc.total_expense(
+                            home_type, offer, interest_rate, float_rent, property_tax)
 
                 data = {'address': address,
                         'city': city,
@@ -153,8 +168,10 @@ def get_data_from_json(raw_json_data):
                         'price_reduction': price_reduction,
                         'year_built': year_built,
                         'home_type': home_type,
-                        'home_status': home_status}
-                properties_list.append(data)
+                        'home_status': home_status,
+                        'total_expense': total_expense}
+                if title != 'New construction':
+                    properties_list.append(data)
         except ValueError as e:
             print(e)
             return None
@@ -253,7 +270,7 @@ if __name__ == "__main__":
 
     print("Fetching data for %s" % (search_str))
 
-    for page in range(1, 2):
+    for page in range(1, pageCnt):
         scraped_temp_data = parse(search_str, page)
         if scraped_temp_data:
             scraped_data = scraped_data + scraped_temp_data
