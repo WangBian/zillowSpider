@@ -76,7 +76,7 @@ def write_data_to_csv(data):
 
     with open("properties-%s.csv" % (search_str), 'wb') as csvfile:
         fieldnames = ['title', 'home_type', 'home_status', 'year_built', 'address', 'city', 'state', 'postal_code',
-                      'facts and features', 'price', 'offer', 'monthly_p_i', 'total_expense', 'rent_zestimate',
+                      'bedrooms', 'bathrooms', 'square_footage', 'price', 'offer', 'monthly_p_i', 'total_expense', 'rent_zestimate',
                       'days_on_zillow', 'price_reduction', 'url']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -125,7 +125,7 @@ def get_data_from_json(raw_json_data):
                 bedrooms = property.get('beds')
                 bathrooms = property.get('baths')
                 area = property.get('area')
-                info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
+                # info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
                 broker = property.get('brokerName')
                 property_url = property.get('detailUrl')
                 title = property.get('statusText')
@@ -160,7 +160,9 @@ def get_data_from_json(raw_json_data):
                         'price': float_price,
                         'offer': offer,
                         'monthly_p_i': monthly_p_i,
-                        'facts and features': info,
+                        'bedrooms': bedrooms,
+                        'bathrooms': bathrooms,
+                        'square_footage': area,
                         'url': property_url,
                         'title': title,
                         'rent_zestimate': rent_zestimate,
