@@ -7,6 +7,7 @@ import roundrobin
 from itertools import cycle
 import offerCalc as oc
 import re
+import simplejson
 
 interest_rate = 4.0
 
@@ -102,7 +103,7 @@ def get_response(url):
     return None
 
 
-def get_data_from_json(raw_json_data):
+def get_data_from_json(raw_json_data, output_format):
     # getting data from json (type 2 of their A/B testing page)
     cleaned_data = None
     properties_list = []
@@ -153,35 +154,35 @@ def get_data_from_json(raw_json_data):
                         total_expense = oc.total_expense(
                             home_type, offer, interest_rate, float_rent, property_tax)
 
-                data = {'address': address,
-                        'city': city,
-                        'state': state,
-                        'postal_code': postal_code,
-                        'price': float_price,
-                        'offer': offer,
-                        'monthly_p_i': monthly_p_i,
-                        'bedrooms': bedrooms,
-                        'bathrooms': bathrooms,
-                        'square_footage': area,
-                        'url': property_url,
-                        'title': title,
-                        'rent_zestimate': rent_zestimate,
-                        'days_on_zillow': days_on_zillow,
-                        'price_reduction': price_reduction,
-                        'year_built': year_built,
-                        'home_type': home_type,
-                        'home_status': home_status,
-                        'total_expense': total_expense}
-                if title not in ['New construction', 'Pre-foreclosure / Auction', 'Auction', 'Lot / Land for sale']:
+                data = {"address": address,
+                        "city": city,
+                        "state": state,
+                        "postal_code": postal_code,
+                        "price": float_price,
+                        "offer": offer,
+                        "monthly_p_i": monthly_p_i,
+                        "bedrooms": bedrooms,
+                        "bathrooms": bathrooms,
+                        "square_footage": area,
+                        "url": property_url,
+                        "title": title,
+                        "rent_zestimate": rent_zestimate,
+                        "days_on_zillow": days_on_zillow,
+                        "price_reduction": price_reduction,
+                        "year_built": year_built,
+                        "home_type": home_type,
+                        "home_status": home_status,
+                        "total_expense": total_expense}
+                if output_format == "JSON":
+                    data = json.dumps(data)
+                if title not in ["New construction", "Pre-foreclosure / Auction", "Auction", "Lot / Land for sale"]:
                     properties_list.append(data)
         except ValueError as e:
             print(e)
             return None
-
     return properties_list
 
-
-def parse(search_str, page):
+def parse(search_str, page, output_format):
     url = create_url(search_str, page)
     response = get_response(url)
 
@@ -197,8 +198,8 @@ def parse(search_str, page):
         # identified as type 2 page
         raw_json_data = parser.xpath(
             '//script[@data-zrr-shared-data-key="mobileSearchPageStore"]//text()')
-        return get_data_from_json(raw_json_data)
-
+        return get_data_from_json(raw_json_data, output_format)
+    '''
     # print("parsing from html page")
     properties_list = []
     for properties in search_results:
@@ -230,19 +231,20 @@ def parse(search_str, page):
         property_url = "https://www.zillow.com" + url[0] if url else None
         is_forsale = properties.xpath('.//span[@class="zsg-icon-for-sale"]')
 
-        properties = {'address': address,
-                      'city': city,
-                      'state': state,
-                      'postal_code': postal_code,
-                      'price': price,
-                      'facts and features': info,
-                      'real estate provider': broker,
-                      'url': property_url,
-                      'title': title,
-                      'rent_zestimate': ''}
+        properties = {"address": address,
+                      "city": city,
+                      "state": state,
+                      "postal_code": postal_code,
+                      "price": price,
+                      "facts and features": info,
+                      "real estate provider": broker,
+                      "url": property_url,
+                      "title": title,
+                      "rent_zestimate": ''}
         if is_forsale:
             properties_list.append(properties)
     return properties_list
+    '''
 
 
 def get_page_cnt(search_str):
@@ -256,25 +258,39 @@ def get_page_cnt(search_str):
 
 if __name__ == "__main__":
     # Reading arguments
-    scraped_data = []
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter)
-    argparser.add_argument('city', help='')
-    argparser.add_argument('state', help='')
+    argparser.add_argument('city', help='City')
+    argparser.add_argument('state', help='State')
+    argparser.add_argument('output_format', help='Output Format: CSV, JSON')
 
     args = argparser.parse_args()
     city = args.city
     state = args.state
     search_str = city + "-" + state
+    output_format = args.output_format
+    jsonOutput = "properties" + search_str + ".json"
 
     # Get page count
     pageCnt = int(get_page_cnt(search_str))
 
     print("Fetching data for %s" % (search_str))
 
-    for page in range(1, pageCnt):
-        scraped_temp_data = parse(search_str, page)
-        if scraped_temp_data:
-            scraped_data = scraped_data + scraped_temp_data
-    print("Writing data to output file")
-    write_data_to_csv(scraped_data)
+    if output_format == "JSON":
+        print("Writing data to JSON output file")
+        with open(jsonOutput, "w") as propertiesJson:
+            for page in range(1, pageCnt):
+                scraped_temp_data = parse(search_str, page, "JSON")
+                if scraped_temp_data:
+                    # write to a json file
+                    for jsonObj in scraped_temp_data:
+                        propertiesJson.write(simplejson.dumps(simplejson.loads(jsonObj), indent=4, sort_keys=True))
+                        propertiesJson.write(",\n")
+    else:
+        scraped_data = []
+        for page in range(1, pageCnt):
+                scraped_temp_data = parse(search_str, page, "CSV")
+                if scraped_temp_data:
+                    scraped_data = scraped_data + scraped_temp_data
+        print("Writing data to CSV output file")
+        write_data_to_csv(scraped_data)
