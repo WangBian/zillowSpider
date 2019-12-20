@@ -129,6 +129,7 @@ def get_data_from_json(raw_json_data, output_format):
                 # info = f'{bedrooms} bds, {bathrooms} ba ,{area} sqft'
                 broker = property.get('brokerName')
                 property_url = property.get('detailUrl')
+                img_src = property.get('imgSrc')
                 title = property.get('statusText')
                 rent_zestimate = property_info.get('rentZestimate')
                 days_on_zillow = property_info.get('daysOnZillow')
@@ -164,6 +165,7 @@ def get_data_from_json(raw_json_data, output_format):
                         "bedrooms": bedrooms,
                         "bathrooms": bathrooms,
                         "square_footage": area,
+                        "img": img_src,
                         "url": property_url,
                         "title": title,
                         "rent_zestimate": rent_zestimate,
@@ -269,14 +271,14 @@ if __name__ == "__main__":
     state = args.state
     search_str = city + "-" + state
     output_format = args.output_format
-    jsonOutput = "properties" + search_str + ".json"
+    jsonOutput = "properties-" + search_str + ".json"
 
     # Get page count
     pageCnt = int(get_page_cnt(search_str))
 
     print("Fetching data for %s" % (search_str))
 
-    if output_format == "JSON":
+    if output_format.upper() == "JSON":
         print("Writing data to JSON output file")
         with open(jsonOutput, "w") as propertiesJson:
             for page in range(1, pageCnt):
