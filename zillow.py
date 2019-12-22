@@ -9,6 +9,7 @@ import offerCalc as oc
 import re
 import simplejson
 import os
+import locale
 
 interest_rate = 4.0
 
@@ -155,13 +156,15 @@ def get_data_from_json(raw_json_data, output_format):
                         monthly_p_i = oc.mortgage_calc(offer, interest_rate)
                         total_expense = oc.total_expense(
                             home_type, offer, interest_rate, float_rent, property_tax)
+                    else:
+                        rent_zestimate = 0
 
                 data = {"address": address,
                         "city": city,
                         "state": state,
                         "postal_code": postal_code,
-                        "price": float_price,
-                        "offer": offer,
+                        "price": to_currency(float_price),
+                        "offer": to_currency(offer),
                         "monthly_p_i": monthly_p_i,
                         "bedrooms": bedrooms,
                         "bathrooms": bathrooms,
@@ -169,7 +172,7 @@ def get_data_from_json(raw_json_data, output_format):
                         "img": img_src,
                         "url": property_url,
                         "title": title,
-                        "rent_zestimate": rent_zestimate,
+                        "rent_zestimate": to_currency(rent_zestimate),
                         "days_on_zillow": days_on_zillow,
                         "price_reduction": price_reduction,
                         "year_built": year_built,
@@ -184,6 +187,7 @@ def get_data_from_json(raw_json_data, output_format):
             print(e)
             return None
     return properties_list
+
 
 def parse(search_str, page, output_format):
     url = create_url(search_str, page)
@@ -205,12 +209,17 @@ def parse(search_str, page, output_format):
 
 
 def get_page_cnt(search_str):
-
     url = create_url(search_str, 1)
     response = get_response(url)
     parser = html.fromstring(response.text)
     pagenation = parser.xpath("//div[@class='search-pagination']//text()")
     return pagenation[len(pagenation) - 2]
+
+def to_currency(price):
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+    result = locale.currency(price, grouping=True)
+    r_len = len(result)
+    return result[0:r_len-3]
 
 
 if __name__ == "__main__":
@@ -226,7 +235,7 @@ if __name__ == "__main__":
     state = args.state
     search_str = city + "-" + state
     output_format = args.output_format
-    jsonOutput = "properties-" + search_str + ".json"
+    jsonOutput = "../Angular_Projects/surRealEstate/src/properties.json"
 
     # Get page count
     pageCnt = int(get_page_cnt(search_str))
