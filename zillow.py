@@ -8,6 +8,7 @@ from itertools import cycle
 import offerCalc as oc
 import re
 import simplejson
+import os
 
 interest_rate = 4.0
 
@@ -78,7 +79,7 @@ def write_data_to_csv(data):
     with open("properties-%s.csv" % (search_str), 'wb') as csvfile:
         fieldnames = ['title', 'home_type', 'home_status', 'year_built', 'address', 'city', 'state', 'postal_code',
                       'bedrooms', 'bathrooms', 'square_footage', 'price', 'offer', 'monthly_p_i', 'total_expense', 'rent_zestimate',
-                      'days_on_zillow', 'price_reduction', 'url']
+                      'days_on_zillow', 'price_reduction', 'url', 'img']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for row in data:
@@ -177,7 +178,7 @@ def get_data_from_json(raw_json_data, output_format):
                         "total_expense": total_expense}
                 if output_format == "JSON":
                     data = json.dumps(data)
-                if title not in ["New construction", "Pre-foreclosure / Auction", "Auction", "Lot / Land for sale"]:
+                if title not in ["Pre-foreclosure / Auction", "Auction", "Lot / Land for sale"]:
                     properties_list.append(data)
         except ValueError as e:
             print(e)
@@ -201,52 +202,6 @@ def parse(search_str, page, output_format):
         raw_json_data = parser.xpath(
             '//script[@data-zrr-shared-data-key="mobileSearchPageStore"]//text()')
         return get_data_from_json(raw_json_data, output_format)
-    '''
-    # print("parsing from html page")
-    properties_list = []
-    for properties in search_results:
-        raw_address = properties.xpath(
-            ".//span[@itemprop='address']//span[@itemprop='streetAddress']//text()")
-        raw_city = properties.xpath(
-            ".//span[@itemprop='address']//span[@itemprop='addressLocality']//text()")
-        raw_state = properties.xpath(
-            ".//span[@itemprop='address']//span[@itemprop='addressRegion']//text()")
-        raw_postal_code = properties.xpath(
-            ".//span[@itemprop='address']//span[@itemprop='postalCode']//text()")
-        raw_price = properties.xpath(
-            ".//span[@class='zsg-photo-card-price']//text()")
-        raw_info = properties.xpath(
-            ".//span[@class='zsg-photo-card-info']//text()")
-        raw_broker_name = properties.xpath(
-            ".//span[@class='zsg-photo-card-broker-name']//text()")
-        url = properties.xpath(".//a[contains(@class,'overlay-link')]/@href")
-        raw_title = properties.xpath(".//h4//text()")
-
-        address = clean(raw_address)
-        city = clean(raw_city)
-        state = clean(raw_state)
-        postal_code = clean(raw_postal_code)
-        price = clean(raw_price)
-        info = clean(raw_info).replace(u"\xb7", ',')
-        broker = clean(raw_broker_name)
-        title = clean(raw_title)
-        property_url = "https://www.zillow.com" + url[0] if url else None
-        is_forsale = properties.xpath('.//span[@class="zsg-icon-for-sale"]')
-
-        properties = {"address": address,
-                      "city": city,
-                      "state": state,
-                      "postal_code": postal_code,
-                      "price": price,
-                      "facts and features": info,
-                      "real estate provider": broker,
-                      "url": property_url,
-                      "title": title,
-                      "rent_zestimate": ''}
-        if is_forsale:
-            properties_list.append(properties)
-    return properties_list
-    '''
 
 
 def get_page_cnt(search_str):
@@ -279,16 +234,23 @@ if __name__ == "__main__":
     print("Fetching data for %s" % (search_str))
 
     if output_format.upper() == "JSON":
+        # write to a json file
         print("Writing data to JSON output file")
         with open(jsonOutput, "w") as propertiesJson:
+            #add opening bracket
+            propertiesJson.write("[\n")
             for page in range(1, pageCnt):
                 scraped_temp_data = parse(search_str, page, "JSON")
                 if scraped_temp_data:
-                    # write to a json file
-                    for jsonObj in scraped_temp_data:
+                    data_len = len(scraped_temp_data)-1
+                    for data_index, jsonObj in enumerate(scraped_temp_data):
                         propertiesJson.write(simplejson.dumps(simplejson.loads(jsonObj), indent=4, sort_keys=True))
-                        propertiesJson.write(",\n")
+                        if not (data_index == data_len and page == (pageCnt-1)):
+                            propertiesJson.write(",\n")
+            #add closing bracket 
+            propertiesJson.write("]")
     else:
+        # write to a csv file
         scraped_data = []
         for page in range(1, pageCnt):
                 scraped_temp_data = parse(search_str, page, "CSV")
