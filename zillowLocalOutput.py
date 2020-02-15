@@ -5,11 +5,11 @@ import argparse
 import json
 import roundrobin
 from itertools import cycle
+import offerCalc as oc
 import re
 import simplejson
 import os
 import locale
-import pymongo
 
 interest_rate = 4.0
 
@@ -74,6 +74,19 @@ def save_to_file(response):
         fp.write(response.text)
 
 
+def write_data_to_csv(data):
+    # saving scraped data to csv.
+
+    with open("properties-%s.csv" % (search_str), 'wb') as csvfile:
+        fieldnames = ['title', 'home_type', 'home_status', 'year_built', 'address', 'city', 'state', 'postal_code',
+                      'bedrooms', 'bathrooms', 'square_footage', 'price', 'offer', 'monthly_p_i', 'total_expense', 'rent_zestimate',
+                      'days_on_zillow', 'price_reduction', 'url', 'img']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)
+
+
 def get_response(url):
 
     # Get response from zillow.com.
@@ -92,7 +105,7 @@ def get_response(url):
     return None
 
 
-def get_data_from_json(raw_json_data):
+def get_data_from_json(raw_json_data, output_format):
     # getting data from json (type 2 of their A/B testing page)
     cleaned_data = None
     properties_list = []
@@ -106,7 +119,7 @@ def get_data_from_json(raw_json_data):
                 'searchResults').get('listResults', [])
 
             for property in search_results:
-                address = property.get('address')
+                address = property.get('addressWithZip')
                 property_info = property.get('hdpData', {}).get('homeInfo')
                 city = property_info.get('city')
                 state = property_info.get('state')
@@ -128,14 +141,23 @@ def get_data_from_json(raw_json_data):
                 home_status = property_info.get('homeStatus')
 
                 float_price = 0
+                monthly_p_i = 0
+                offer = 0
+                total_expense = 0
 
                 if price is not None and price != '':
                     float_price = float(re.sub('[^0-9]', '', price[1:]))
-
-                if rent_zestimate is not None and rent_zestimate != '':
-                    float_rent = float(rent_zestimate)
-                else:
-                    rent_zestimate = 0
+                    property_tax = float_price * 0.02
+                    monthly_p_i = oc.mortgage_calc(float_price, interest_rate)
+                    if rent_zestimate is not None and rent_zestimate != '':
+                        float_rent = float(rent_zestimate)
+                        offer = oc.offer(home_type, float_price,
+                                         interest_rate, float_rent, property_tax)
+                        monthly_p_i = oc.mortgage_calc(offer, interest_rate)
+                        total_expense = oc.total_expense(
+                            home_type, offer, interest_rate, float_rent, property_tax)
+                    else:
+                        rent_zestimate = 0
 
                 data = {"address": address,
                         "city": city,
@@ -143,6 +165,8 @@ def get_data_from_json(raw_json_data):
                         "postal_code": postal_code,
                         "price": float_price,
                         "price_usd": to_currency(float_price),
+                        "offer": to_currency(offer),
+                        "monthly_p_i": monthly_p_i,
                         "bedrooms": bedrooms,
                         "bathrooms": bathrooms,
                         "square_footage": area,
@@ -154,10 +178,10 @@ def get_data_from_json(raw_json_data):
                         "price_reduction": price_reduction,
                         "year_built": year_built,
                         "home_type": home_type,
-                        "home_status": home_status}
-
-                # data = json.dumps(data)
-
+                        "home_status": home_status,
+                        "total_expense": total_expense}
+                if output_format == "JSON":
+                    data = json.dumps(data)
                 if title not in ["Pre-foreclosure / Auction", "Auction", "Lot / Land for sale"]:
                     properties_list.append(data)
         except ValueError as e:
@@ -166,7 +190,7 @@ def get_data_from_json(raw_json_data):
     return properties_list
 
 
-def parse(search_str, page):
+def parse(search_str, page, output_format):
     url = create_url(search_str, page)
     response = get_response(url)
 
@@ -182,7 +206,7 @@ def parse(search_str, page):
         # identified as type 2 page
         raw_json_data = parser.xpath(
             '//script[@data-zrr-shared-data-key="mobileSearchPageStore"]//text()')
-        return get_data_from_json(raw_json_data)
+        return get_data_from_json(raw_json_data, output_format)
 
 
 def get_page_cnt(search_str):
@@ -191,7 +215,6 @@ def get_page_cnt(search_str):
     parser = html.fromstring(response.text)
     pagenation = parser.xpath("//div[@class='search-pagination']//text()")
     return pagenation[len(pagenation) - 2]
-
 
 def to_currency(price):
     locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
@@ -206,32 +229,42 @@ if __name__ == "__main__":
         formatter_class=argparse.RawTextHelpFormatter)
     argparser.add_argument('city', help='City')
     argparser.add_argument('state', help='State')
+    argparser.add_argument('output_format', help='Output Format: CSV, JSON')
 
     args = argparser.parse_args()
     city = args.city
     state = args.state
     search_str = city + "-" + state
-
-    host= 'ds061731.mlab.com'
-    port = 61731
-    username = 'bianwssr'
-    password = '19941992srl!'
-    client = pymongo.MongoClient(host, port, retryWrites=False)
-    db = client['heroku_2tsj8l2w']
-    db.authenticate(username, password)
-    col = db.properties
-    properties_dict = []
+    output_format = args.output_format
+    jsonOutput = "../Angular_Projects/surRealEstate/src/properties.json"
 
     # Get page count
     pageCnt = int(get_page_cnt(search_str))
 
     print("Fetching data for %s" % (search_str))
 
-    for page in range(1, pageCnt):
-        scraped_temp_data = parse(search_str, page)
-        if scraped_temp_data:
-            properties_dict += scraped_temp_data
-
-    # print(properties_dict)
-    
-    x = col.insert_many(properties_dict)
+    if output_format.upper() == "JSON":
+        # write to a json file
+        print("Writing data to JSON output file")
+        with open(jsonOutput, "w") as propertiesJson:
+            #add opening bracket
+            propertiesJson.write("[\n")
+            for page in range(1, pageCnt):
+                scraped_temp_data = parse(search_str, page, "JSON")
+                if scraped_temp_data:
+                    data_len = len(scraped_temp_data)-1
+                    for data_index, jsonObj in enumerate(scraped_temp_data):
+                        propertiesJson.write(simplejson.dumps(simplejson.loads(jsonObj), indent=4, sort_keys=True))
+                        if not (data_index == data_len and page == (pageCnt-1)):
+                            propertiesJson.write(",\n")
+            #add closing bracket 
+            propertiesJson.write("]")
+    else:
+        # write to a csv file
+        scraped_data = []
+        for page in range(1, pageCnt):
+                scraped_temp_data = parse(search_str, page, "CSV")
+                if scraped_temp_data:
+                    scraped_data = scraped_data + scraped_temp_data
+        print("Writing data to CSV output file")
+        write_data_to_csv(scraped_data)
