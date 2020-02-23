@@ -215,7 +215,7 @@ if __name__ == "__main__":
     host= 'ds061731.mlab.com'
     port = 61731
     username = 'bianwssr'
-    password = '19941992srl!'
+    password = '********'
     client = pymongo.MongoClient(host, port, retryWrites=False)
     db = client['heroku_2tsj8l2w']
     db.authenticate(username, password)
